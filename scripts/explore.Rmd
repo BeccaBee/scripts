@@ -1,0 +1,34 @@
+---
+title: "Treatment_effects"
+author: "Rebecca Bevans"
+date: "November 24, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+load packages and data:
+```{r}
+library(tidyverse)
+library(picante)
+library(mgcv)
+subplot<-subplot
+subcom<-subplot.comm
+wholeplot<-wholeplot
+wholecom<-wholeplot.comm
+```
+
+CLA Analysis:
+```{r}
+JulCLA<-read.csv("~/PRP_thesis/Data/JulCLAsp2.csv", row.names=1)
+JulCLA_meta <- read.csv("~/PRP_thesis/Data/JulCLA_meta.csv", row.names=1)
+all.equal(rownames(JulCLA), rownames(JulCLA_meta))
+```
+
+Soil data:
+```{r}
+
+```
+

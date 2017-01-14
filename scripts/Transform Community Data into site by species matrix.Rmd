@@ -1,0 +1,84 @@
+---
+title: "Transform data"
+author: "Rebecca Bevans"
+date: "November 5, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in dataset and reshape package:
+```{r}
+library(reshape)
+library(reshape2)
+prpcomm<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/PRP.comm.11.7.16.csv")
+
+```
+
+combine site characteristics into site column:
+```{r}
+prpcomm$site<-paste(prpcomm$year, prpcomm$block, prpcomm$level, prpcomm$diversity, prpcomm$transect, prpcomm$quadrat)
+```
+
+
+Recast dataframe to get the site x species format:
+```{r}
+site.sp.matrix<-dcast(prpcomm, site ~ taxa, value.var = 'cover_class', fun.aggregate=mean)
+#convert output to data frame
+site.sp.matrix<-as.data.frame(site.sp.matrix)
+#convert NaNs to 0
+site.sp.matrix[is.na(site.sp.matrix)]<-0
+```
+
+Melt data back into column form to average quadrats within plots:
+```{r}
+prp.column.quad<-melt(site.sp.matrix, id=c('site'))
+
+```
+Now all of the zeroes have been added in, so resulting dataframe is much bigger. Now average over the plots:
+```{r}
+site.sp.matrix<-dcast(prp.column.quad, site ~ variable, value.var = 'value', fun.aggregate = mean)
+colnames(site.sp.matrix)
+
+```
+
+combine columns that have been arbitrarily separated:
+```{r}
+#Ambrosia psilostachya
+site.sp.matrix$Ambpsilo1<-cbind(site.sp.matrix$Ambpsilo, site.sp.matrix$Ambpsilo, deparse.level=1)
+colnames(site.sp.matrix)
+
+#Now exclude original columns:
+prp.community <- site.sp.matrix[c(-6,-7)]
+colnames(prp.community)
+
+#PASTE Artludo (vars 9,10) Asclepia syriaca (vars 12/13), bare (vars 21/22), Carex brevior(vars.28, 29), Cirsium altissima (vars 34/35), Cornus sp (vars 41/42), #Coreopsis tinctoria (vars 25, 36, 37), Carex brevior (vars. 24, 25), Dalea candida (vars. 46, 47), #Elytra/Elytrach(vars. 55, 56), Eragrostis trichodes (vars. 58, 59), Eupatorium altissima (61, 62, 63), Glyle #(69, 70), Solican (127, 128, 129):
+
+prp.community$Asclepsyr1<-cbind(prp.community$Asclepsyr, prp.community$`Asclepsyr `, deparse.level = 1)
+prp.community$bare1<-cbind(prp.community$bare, prp.community$`bare `, deparse.level = 1)
+prp.community$Carexbrev1<-cbind(prp.community$Carexbrev, prp.community$`Carexbrev `, deparse.level = 1)
+prp.community$Ciralt1<-cbind(prp.community$Ciralt, prp.community$`Ciralt `, deparse.level=1)
+prp.community$Cornussp1<-cbind(prp.community$Cornussp, prp.community$`Cornussp `, deparse.level=1)
+prp.community$Cortinct1<-cbind(prp.community$Cortinct, prp.community$`Cortinct `, prp.community$`Cortinct    `, deparse.level=1)
+prp.community$Daleacand1<-cbind(prp.community$Daleacand, prp.community$`Daleacand `, deparse.level=1)
+prp.community$Elytra1<-cbind(prp.community$Elytra, prp.community$Elytrach, deparse.level = 1)
+prp.community$Eragrostri1<-cbind(prp.community$Eragrostri, prp.community$`Eragrostri    `, deparse.level = 1)
+prp.community$Eupatalt1<-cbind(prp.community$Eupatalt, prp.community$`Eupatalt `, prp.community$`Eupatalt  `, deparse.level = 1)
+prp.community$Glyle1<-cbind(prp.community$Glyle, prp.community$`Glyle `, deparse.level = 1)
+prp.community$Solican<-cbind(prp.community$Solican, prp.community$`Solican   `, deparse.level = 1)
+
+#exclude original columns:
+prp.community<-prp.community[c(-9, -10, -12, -13, -21, -22, -28, -29, -41, -42, -43, -44, -45, -46, -47, -55, -56, -58, -59, -61, -62, -63, -69, -70, -127, -128, -129)]
+colnames(prp.community)
+
+#write csv
+write.csv(prp.community, file="prp.community.csv")
+```
+
+
+
+```
+
+

@@ -1,0 +1,45 @@
+---
+title: "Data Transform"
+author: "Rebecca Bevans"
+date: "October 30, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in dataset and reshape package:
+```{r}
+library(reshape)
+ldsub16<- read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/2016_LD_subplots.csv")
+
+```
+
+Recast dataframe to get the site x species format:
+```{r}
+site.sp.quad<-cast(ldsub16, date + block + level + subplot_id + quadrat ~ taxa, value = 'cover_class', FUN=mean)
+#convert output to data frame
+site.sp.quad<-as.data.frame(site.sp.quad)
+#convert NaNs to 0
+site.sp.quad[is.na(site.sp.quad)]<-0
+```
+
+Melt data back into column form to average quadrats within plots:
+```{r}
+column.quad<-melt(site.sp.quad, id=c('date', 'block', 'level','subplot_id', 'quadrat'))
+
+```
+Now all of the zeroes have been added in, so resulting dataframe is much bigger. Now to average over the plots, we have to :
+```{r}
+
+site.sp.plot <- cast(column.quad, date + block +level + subplot_id ~ variable, value='value', fun.aggregate = mean)
+```
+
+Rename the dataset so it's uniquely identifiable:
+```{r}
+ldsub16.community<-site.sp.plot
+
+```
+
+Now do the whole thing again for each data set

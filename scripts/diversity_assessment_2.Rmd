@@ -1,0 +1,387 @@
+---
+title: "diversity_assessment_#2"
+author: "Rebecca Bevans"
+date: "November 27, 2016"
+output: html_document
+---
+
+---
+title: "Diversity assessment"
+author: "Rebecca Bevans"
+date: "November 8, 2016"
+output: html_document
+---
+
+title: "prp_community_assessment"
+author: "Rebecca Bevans"
+date: "November 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+load data
+```{r}
+library(picante)
+library(tidyverse)
+meta_data<-read.csv("~/PRP_thesis/Data/meta_data.csv", row.names=2)
+row.names(meta_data)
+meta_data<-meta_data[c(-1)]
+meta_data$unit<-paste(meta_data$block, meta_data$level)
+#this isn't right, just manually load comm.csv from data folder
+     #comm<-read.csv("~/PRP_thesis/Data/comm.csv", row.names=2)
+
+class(comm)
+dim(comm)
+rownames(comm)
+colnames(comm)
+comm[1:5, 1:5]
+
+all.equal(rownames(comm), rownames(meta_data))
+
+```
+
+Compare species richness between habitats:
+```{r}
+#species richness
+specnumber(comm)
+#check total abundance /sample
+apply(comm, 1, sum)
+comm.total<-decostand(comm, method="total")
+apply(comm.total, 1, sum)
+comm[1:5, 1:5]
+
+colnames(comm)
+```
+
+```{r}
+
+#fillCols1<-c(1='cornflowerblue', 2='indianred4')
+#myPanel.divplot <- function(x=x, y=y, ...) {
+#    fill <- fillCols1[intersect(levels(x), unique(x))] 
+#    panel.bwplot(x=x, y=y, ..., groups=Col5, fill=fill)
+#}
+
+boxplot(specnumber(comm)~meta_data$diversity, ylab = "# of species")
+mod<-aov(specnumber(comm)~meta_data$diversity, ylab = "# of species")
+summary(mod)
+
+boxplot(specnumber(comm)~meta_data$year, ylab = "# of species")
+
+boxplot(specnumber(comm)~meta_data$diversity:meta_data$treat)
+
+mod1<-aov(specnumber(comm)~meta_data$unit + meta_data$treat + meta_data$unit:meta_data$treat)
+summary(mod1)
+
+div.trt<-aov(specnumber(comm)~meta_data$diversity + meta_data$treat + meta_data$diversity:meta_data$treat)
+summary(div.trt)
+library(pander)
+library(mgcv)
+bare.div.trt<-pander(div.trt)
+pdf(bare.div.trt, file = "~/PRP_thesis/Graphs/bare.div.trt.pdf")
+
+##create the color scheme for the bwplots
+fillCols<-c(biomass='cornflowerblue', control='indianred4', nitrogen='olivedrab', biomass_nitrogen='coral1', rainout='darkgoldenrod1', no='burlywood')
+myPanel.bwplot <- function(x=x, y=y, ...) {
+    fill <- fillCols[intersect(levels(x), unique(x))] 
+    panel.bwplot(x=x, y=y, ..., groups=Col5, fill=fill)
+}
+
+fill<-c(2015.1 ='brickred', 2015.2 = 'goldenrod1', 2016.1='cornflowerblue', 2016.2 = 'cyan')
+
+boxplot(specnumber(comm)~meta_data$bare + meta_data$diversity)
+
+richbyyr<-boxplot(specnumber(comm)~meta_data$year:meta_data$diversity, notch=TRUE, col = (c('indianred4','goldenrod1','cornflowerblue','cyan')), main="Species Richness by Year and Diversity")
+#don't know why but this ins't working. Manually created image
+  #jpeg(richbyyr, file="~/PRP_thesis/Graphs/richbyyr.jpeg")
+bwplot(specnumber(comm) ~ meta_data$treat | factor(meta_data$year), comm)
+
+
+bwplot(specnumber(comm)~meta_data$treat | factor(meta_data$unit), data=comm, panel=myPanel.bwplot)
+
+```
+
+Statistical test of difference based on diversity and year:
+```{r}
+library(pander)
+#welch's t-test:
+div<-t.test(specnumber(comm)~meta_data$diversity)
+pander(div)
+yr<-t.test(specnumber(comm)~meta_data$year)
+pander(yr)
+```
+Both year and diversity plantings have significant impact on species richness at the level of the individual quadrat. Now I want to see if these differences hold at the level of treatments.
+
+We have our species comparisons by quadrat, but these are not individual observations. Need to average to the transect level. I think the easiest way to do this will be to subset my larger dataset based on the block, level, and transects:
+```{r}
+#load subsetted data from my bareground rmarkdown
+subplot.comm <- subset() read.csv("~/PRP_thesis/Data/subplot.comm.csv", row.names=1)
+subplot <- read.csv("~/PRP_thesis/Data/subplot.csv", row.names=1)
+all.equal(rownames(subplot.comm), rownames(subplot))
+bwplot(specnumber(subplot.comm)~subplot$treat | factor(subplot$replicate), subplot.comm, panel=myPanel.bwplot)
+mod<-aov(specnumber(subplot.comm)~subplot$treat + subplot$replicate + subplot$treat:subplot$replicate)
+summary(mod)
+
+##now wholeplot data:
+wholeplotcomm <- read.csv("~/PRP_thesis/Data/wholeplot.comm", row.names=1)
+wholeplot <- read.csv("~/PRP_thesis/Data/wholeplot.csv", row.names=1)
+all.equal(rownames(wholeplotcomm), rownames(wholeplot))
+
+#average by transect within each wholeplot
+bwplot(specnumber(wholeplotcomm)~wholeplot$transect | factor(wholeplot$replicate), wholeplotcomm, panel=myPanel.bwplot)
+
+#average by wholeplot
+bwplot(specnumber(wholeplotcomm)~wholeplot$treat | factor(wholeplot$replicate), wholeplotcomm, panel=myPanel.bwplot)
+
+#anova to test if statistical differences exist
+wholemod<-aov(specnumber(wholeplotcomm)~ wholeplot$replicate)
+summary(wholemod)
+
+library(mgcv)
+wholemod2<-gam(specnumber(wholeplotcomm)~wholeplot$year + wholeplot$replicate + wholeplot$year:wholeplot$replicate)
+summary(wholemod2)
+
+bwplot(specnumber(wholeplotcomm)~wholeplot$replicate | factor(wholeplot$year), wholeplotcomm)
+```
+
+This is copied from a tutorial on analyzing community data:
+```{r}
+#Species-area and species-individual curves:
+spa<-specaccum(comm)
+plot(spa)
+plot(spa, ci.type="poly", col="blue", lwd=2, ci.lty=0, ci.col="lightblue")
+
+#Now try the same thing doing individuals rather than sites
+#spi<-specaccum(comm, method="rarefaction")
+#plot(spi)
+##This won't work with my data unless I transpose all of the cover data to 1s and 0s##
+
+#Ordination
+#Distance measures:
+#Bray-Curtis index = percent similarity including species abundances. #Sorenson's index = percent similarity based on presence-absence data.
+
+#calc. Bray-Curtis distance among samples
+comm.bc.dist<-vegdist(comm, method = "bray")
+#cluster communities using average-linkage algorithm
+comm.bc.clust<-hclust(comm.bc.dist, method = "average")
+#plot cluster diagram
+plot(comm.bc.clust, ylab = "Bray-Curtis dissimilarity")
+#create a map of the plots in community composition space using Non-metric #Multidimensional scaling.
+
+bci.mds<-metaMDS(comm, distance = "bray", k=2, trymax = 20, autotransform = TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+
+mds.fig<-ordiplot(bci.mds, type = "none")
+##don't use this one:
+        #plot(bci.mds, choices = c(1,2), type="n")
+points(bci.mds, display = c("sites"))
+
+text(bci.mds, display = c("sites"))
+
+
+##Now I'm going to try to visualize these communities by site and treatment
+#plot just the samples, colour by habitat, pch=19 means plot a circle:
+points(mds.fig, "sites", pch = 19, col = "blue", 
+       select = cover_data$diversity=="1")
+points(mds.fig, "sites", pch=19, col="goldenrod1",
+       select=cover_data$diversity=="2")
+#add confidence ellipses around habitat types
+ordiellipse(bci.mds, cover_data$diversity, conf = 0.95, label=TRUE)
+
+#overlay the cluster results calculated earlier
+ordicluster(bci.mds, comm.bc.clust, col="gray")
+```
+
+stressplot to test goodness of fit:
+```{r}
+stressplot(bci.mds)
+```
+
+Now I'm going to do the whole thing again dividing up by assessment scale and year:
+```{r}
+#calc. Bray-Curtis distance among samples
+wholecomm.bc.dist<-vegdist(wholeplotcomm, method = "bray")
+#cluster communities using average-linkage algorithm
+wholecomm.bc.clust<-hclust(wholecomm.bc.dist, method = "average")
+#plot cluster diagram
+plot(wholecomm.bc.clust, ylab = "Bray-Curtis dissimilarity")
+#create a map of the plots in community composition space using Non-metric #Multidimensional scaling.
+
+wbci.mds<-metaMDS(wholeplotcomm, distance = "bray", k=2, trymax = 20, autotransform = TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+
+wmds.fig<-ordiplot(wbci.mds, type = "none")
+##or:
+#plot(wbci.mds, choices = c(1,2), type="n")
+
+points(wbci.mds, display = c("sites"))
+
+text(wbci.mds, display = c("sites"))
+
+
+##Now I'm going to try to visualize these communities by site and treatment
+#plot just the samples, colour by habitat, pch=19 means plot a circle:
+points(wmds.fig, "sites", pch = 19, col = "aquamarine", 
+       select = wholeplot$diversity=="1" & wholeplot$year=="2015")
+points(wmds.fig, "sites", pch = 19, col = "blue", 
+      select = wholeplot$diversity=="2" & wholeplot$year=="2015")    
+points(wmds.fig, "sites", pch=19, col= "goldenrod1",
+       select = wholeplot$diversity=="1" & wholeplot$year=="2016")
+points(wmds.fig, "sites", pch=19, col="olivedrab", 
+      select = wholeplot$diversity=="2" & wholeplot$year=="2016")
+
+#try it a different way, organizing by experimental replicate
+points(wmds.fig, "sites", pch = 19, col = "goldenrod2", 
+       select = wholeplot$replicate=="a 1")
+points(wmds.fig, "sites", pch = 19, col = "orange", 
+      select = wholeplot$replicate=="a 3")    
+points(wmds.fig, "sites", pch=19, col= "olivedrab",
+       select = wholeplot$replicate=="a 4")
+points(wmds.fig, "sites", pch=19, col="darkslategray1", 
+      select = wholeplot$replicate=="b 2")
+points(wmds.fig, "sites", pch=19, col="coral1", 
+      select = wholeplot$replicate=="b 4")      
+points(wmds.fig, "sites", pch=19, col="cyan", 
+      select = wholeplot$replicate=="c 1")
+points(wmds.fig, "sites", pch=19, col="indianred4", 
+      select = wholeplot$replicate=="c 2")
+points(wmds.fig, "sites", pch=19, col="seashell2", 
+      select = wholeplot$replicate=="c 4")      
+
+      
+#add confidence ellipses around habitat types
+ordiellipse(wbci.mds, wholeplot$diversity, conf = 0.95, label=TRUE)
+ordiellipse(wbci.mds, wholeplot$year, conf=0.95, label=TRUE)
+#overlay the cluster results calculated earlier
+ordicluster(wbci.mds, comm.bc.clust, col="gray")
+```
+
+stressplot to test goodness of fit:
+```{r}
+stressplot(wbci.mds)
+```
+
+Now at the subplot scale
+```{r}
+#calc. Bray-Curtis distance among samples
+subcomm.bc.dist<-vegdist(subplot.comm, method = "bray")
+#cluster communities using average-linkage algorithm
+subcomm.bc.clust<-hclust(subcomm.bc.dist, method = "average")
+#plot cluster diagram
+plot(subcomm.bc.clust, ylab = "Bray-Curtis dissimilarity")
+#create a map of the plots in community composition space using Non-metric #Multidimensional scaling.
+
+sbci.mds<-metaMDS(subplot.comm, distance = "bray", k=2, trymax = 20, autotransform = TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+
+smds.fig<-ordiplot(sbci.mds, type = "none")
+##or:
+#plot(sbci.mds, choices = c(1,2), type="n")
+
+points(sbci.mds, display = c("sites"))
+
+text(sbci.mds, display = c("sites"))
+
+
+##Now I'm going to try to visualize these communities by site and treatment
+#plot just the samples, colour by habitat, pch=19 means plot a circle:
+points(smds.fig, "sites", pch = 19, col = "aquamarine", 
+       select = subplot$diversity=="1" & subplot$year=="2015")
+points(smds.fig, "sites", pch = 19, col = "blue", 
+      select = subplot$diversity=="2" & subplot$year=="2015")    
+points(smds.fig, "sites", pch=19, col= "goldenrod1",
+       select = subplot$diversity=="1" & subplot$year=="2016")
+points(smds.fig, "sites", pch=19, col="olivedrab", 
+      select = subplot$diversity=="2" & subplot$year=="2016")
+
+#add confidence ellipses around habitat types
+ordiellipse(sbci.mds, subplot$diversity, conf = 0.95, label=TRUE)
+ordiellipse(sbci.mds, subplot$year, conf=0.95, label=TRUE)
+
+
+#try it a different way, organizing by experimental replicate
+
+smds.fig<-ordiplot(sbci.mds, type = "none")
+points(sbci.mds, display = c("sites"))
+
+subplot$replicate<-paste(subplot$block, subplot$level)
+
+points(smds.fig, "sites", pch = 19, col = "goldenrod2", 
+       select = subplot$replicate=="a 1")
+points(smds.fig, "sites", pch = 19, col = "orange", 
+      select = subplot$replicate=="a 3")    
+points(smds.fig, "sites", pch=19, col= "olivedrab",
+       select = subplot$replicate=="a 4")
+points(smds.fig, "sites", pch=19, col="darkslategray1", 
+      select = subplot$replicate=="b 2")
+points(smds.fig, "sites", pch=19, col="coral1", 
+      select = subplot$replicate=="b 4")      
+points(smds.fig, "sites", pch=19, col="cyan", 
+      select = subplot$replicate=="c 1")
+points(smds.fig, "sites", pch=19, col="indianred4", 
+      select = subplot$replicate=="c 2")
+points(smds.fig, "sites", pch=19, col="seashell2", 
+      select = subplot$replicate=="c 4")      
+
+      
+#add confidence ellipses around habitat types
+ordiellipse(sbci.mds, subplot$diversity, conf = 0.95, label=TRUE)
+ordiellipse(sbci.mds, subplot$year, conf=0.95, label=TRUE)
+#overlay the cluster results calculated earlier
+ordicluster(wbci.mds, comm.bc.clust, col="gray")
+```
+
+stressplot to test goodness of fit:
+```{r}
+stressplot(wbci.mds)
+```
+
+Large overlaps in the species diversity at the quadrat level among diversity treatments and year of experiment. It seems that time may be the biggest variable determining diferences than anything else.
+
+
+How many plots does each species occur in?
+```{r}
+
+library(labdsv)
+comm.cover<-comm.noseed
+x<-c(1, 1.333333, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+y<- c(3, 7, 9, 15, 26.25, 37.5, 50, 62.5, 73.75, 85, 91.25, 97.5, 3, 15, 37.5, 62.5, 85, 97.5)
+comm.cover<-vegtrans(comm.cover, x, y)
+
+list(comm.cover$Ange, comm.cover$Achmil)
+
+library(tidyverse)
+
+spc_pres<-apply(comm.cover > 0,2, sum)
+plot(sort(spc_pres))
+
+plot(sort(spc_pres), log='y')    
+
+
+species<-sort(spc_pres)
+
+library(pander)
+pander(species)
+as.matrix(species)
+
+#this doesn't work. ignore. #pdf(species, file = "~/PRP_thesis/Graphs/species.pdf")
+hist(spc_pres)
+hist(log(spc_pres))
+```
+
+What is the mean cover of each species when it occurs(ignoring zeroes where it is absent)?
+```{r}
+tmp<-apply(comm.cover, 2, sum)
+spc_mean<-tmp/spc_pres
+as.matrix(spc_mean)
+plot(sort(spc_mean))
+```
+
+Is the mean abundance of species correlated with the number of plots they occur in?
+```{r}
+plot(spc_pres, spc_mean)
+identify(spc_pres, spc_mean)
+identify(spc_pres, spc_mean, names(comm.cover))
+
+#labdsv
+abuocc(comm.cover)
+```
+

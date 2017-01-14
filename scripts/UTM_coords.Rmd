@@ -1,0 +1,67 @@
+
+---
+title: "utm_coords"
+author: "Rebecca Bevans"
+date: "November 24, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+load libraries and data:
+```{r}
+library(picante)
+library(tidyverse)
+library(mgcv)
+#meta<-cover_data
+#head(meta)
+#colnames(meta)
+#meta$replicate<-paste(meta$block, meta$level)
+write.csv(meta, file="~/PRP_thesis/Data/meta.csv")
+cla<-read.csv("~/PRP_thesis/Data/Cla_July2016.csv", header = TRUE)
+as.data.frame(cla)
+cla$site<-paste(cla$block, cla$level, cla$diversity, cla$transect, cla$sample)
+write.csv(cla, file = "~/PRP_thesis/Data/cla.csv")
+colnames(cla)
+
+
+```
+
+get cla to sitexspecies format:
+```{r}
+library(reshape)
+library(reshape2)
+```
+
+Cast data
+```{r}
+site.sp.matrix<-dcast(cla, site ~ taxa, value.var = 'JulyCLA', fun.aggregate=mean)
+#convert output to data frame
+site.sp.matrix<-as.data.frame(site.sp.matrix)
+#convert NaNs to 0
+site.sp.matrix[is.na(site.sp.matrix)]<-0
+```
+
+Melt data back into column form to average quadrats within plots:
+```{r}
+prp.column.quad<-melt(site.sp.matrix, id=c('site'))
+
+```
+Now all of the zeroes have been added in, so resulting dataframe is much bigger. Now average over the plots:
+```{r}
+site.sp.matrix<-dcast(prp.column.quad, site ~ variable, value.var = 'value', fun.aggregate = mean)
+colnames(site.sp.matrix)
+write.csv(site.sp.matrix, file = "~/PRP_thesis/Data/JulCLAsp2.csv")
+JulCLAsp2<-site.sp.matrix
+
+```
+
+load metadata for JulCLAsp2:
+```{r}
+julclameta<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/Rdata/JulCLA_meta.csv", row.names=1)
+
+
+```
+

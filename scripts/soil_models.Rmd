@@ -1,0 +1,50 @@
+---
+title: "Untitled"
+author: "Rebecca Bevans"
+date: "November 29, 2016"
+output: html_document
+---
+
+###Global models and variable correlations###
+
+```{r}
+library(picante)
+library(tidyverse)
+soil<-soil_data_prp1
+soil$site<-paste(soil$year, soil$block, soil$level, soil$diversity, soil$transect)
+library(ggplot2)
+library(GGally)
+library(car)
+pair<-ggpairs(soil_data_prp[,7:18])
+soil$Omloi<-as.numeric(soil$Omloi)
+is.numeric(soil$Omloi)
+cor(soil$UTM_north, soil$Omloi)
+cov(soil$UTM_north, soil$Omloi)
+plot<-ggplot(soil, aes(x = UTM_north, y = log(Omloi))
+plot + geom_point(color=soil$solvita.ppmC.) + geom_smooth()
+
+plotlm<-lm(log(Omloi)~UTM_north, data=soil)
+summary(plotlm)
+plot(plotlm)
+
+solplot<-ggplot(soil, aes(x=UTM_north, y=solvita.ppmC.))
+solplot + geom_point(color=soil$Omloi) + geom_smooth()
+
+solbox<-ggplot(subset(soil, year==2016), aes(x=treat, y=solvita.ppmC.))
+solbox + geom_boxplot()
+solaov<-aov(solvita.ppmC.~treat, data = subset(soil, year==2016))
+summary(solaov)
+
+solbare<-aov(soil$solvita.ppmC.~ meta$year + meta$treat + meta$bare + meta$year:meta$treat)
+
+soil$diversity
+write.csv(soil, file = "~/PRP_thesis/Data/soil2.csv")
+soil.combined<-cbind(soil, meta, by=site)
+```
+
+
+```{r}
+JulCLAsp2<-JulCLAsp2
+JulCLA_meta <- read.csv("~/PRP_thesis/Data/JulCLA_meta.csv", row.names=1)
+```
+

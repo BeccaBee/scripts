@@ -1,0 +1,168 @@
+---
+title: "CLA_exploration"
+author: "Rebecca Bevans"
+date: "October 1, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load libraries/data:
+```{r echo=FALSE}
+CLA<-read.csv("P:/Research/Thesis/PRP_thesis/Data/cla_2016_corrected.csv")
+library(tidyverse)
+library(broom)
+library(ggplot2)
+View(CLA)
+```
+
+Test CLA as function of diversity:
+```{r echo=FALSE}
+fit<-aov(cla_avg~diversity, data = CLA)
+summary(fit)  
+#No difference based on diversity
+
+ggplot(CLA, aes(x=taxa, y=cla_avg))+ 
+  geom_point(size = 2)
+#this is confusing - why are ANGE and Solidago doubled????
+#FIXED IT
+```
+
+Test CLA as function of location(latitutde)
+```{r }
+fitlat<-lm(CLA$cla_avg~ UTM_north, data=CLA)
+summary(fitlat)
+#Nothing is important here. 
+
+#Try adding in random effects:
+library(lmerTest)
+fitlatlmer<-lmer(cla_avg ~ UTM_north + (1|block) + (1|level), data=CLA)
+summary(fitlatlmer)
+#Just not that much variation by location. That's cool. 
+```
+
+Test CLA as function of taxa:
+```{r}
+fitspecies<-aov(cla_avg~taxa, data=CLA)
+summary(fitspecies)
+#HUGE difference by taxa
+
+#lmer
+lmerfitspecies<-lmer(cla_avg~taxa + (1|block) + (1|level), data=CLA)
+summary(lmerfitspecies)
+#WHOA huge difference!!!
+
+#Now let's make a boxplot of the differences:
+#first do least-squares means tests
+z<-lmerfitspecies
+plot(z)
+a<-lsmeans(z, c("taxa"))
+a
+az<-anova(z)
+az
+##I don't know why these values are so significant. 
+##Why are group means 
+#boxplot
+dat=CLA
+#View(dat)
+dat$diversity=as.factor(dat$diversity)
+dat$predaz=predict(z)
+
+##now plot the predicted values based on the linear mixed-effects model
+zplot<-ggplot(data=dat, aes(x=taxa, y=predaz, fill=taxa)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Taxa", y="Chlorophyll by taxa + random effects of blockID")
+zplot
+
+```
+
+Test CLA as function of treatment:
+```{r}
+fittrt<-aov(cla_avg~trt, data=CLA, na.rm=TRUE)
+summary(fittrt)
+
+#lmer
+lmertrt<-lmer(cla_avg~trt + (1|block) + (1|level), data=CLA)
+summary(lmertrt)
+#Treatment is also significant. That's really cool.
+```
+There is no overall pattern based on latitude or diversity, but there is a difference based on species and by TREATMENT! 
+
+Now we can dig into individual species to test responses to treatments.
+
+Filter data to test solidago:
+```{r echo=FALSE}
+dfsoli<-filter(CLA, taxa=="solidago")
+
+```
+Now test solidago variation based on diversity level:
+```{r echo=FALSE}
+fit1<-aov(cla_avg~trt*diversity, data=dfsoli)
+summary(fit1)
+library(ggplot2)
+```
+
+Plotly plots:
+```{r echo=FALSE}
+library(plotly)
+plot_ly(dfsoli, x= ~diversity, y = ~cla_avg, color= ~trt, type="box")%>%
+  layout(boxmode="group")
+
+plot_ly(dfsoli, x= ~diversity, y=~cla_avg, color=~trt, type="box")
+        
+```
+Solidago chlorophyll varies significantly based on diversity level.
+
+Let's plot it using a boxplot:
+```{r echo=FALSE}
+boxplot(cla_avg~trt:diversity, data=dfsoli)
+
+```
+
+
+Now test solidago variation based on latitude:
+```{r echo=FALSE}
+fit2<-lm(cla_avg~UTM_north, data=dfsoli)
+summary(fit2)
+```
+Solidago chlorophyll content does not vary based on latitude.
+
+Now test solidago variation based on treatment:
+```{r echo=FALSE}
+fit3<-aov(cla_avg~trt, data=dfsoli)
+summary(fit3)
+```
+There is significant variation based on treatment. Let's check which treatment is most important:
+```{r echo=FALSE}
+boxplot(cla_avg~trt, data=dfsoli, ylab="Leaf Chlorophyll Content (nmol/cm^2)", xlab="Treatment", col=
+          c("darkorange1", "firebrick3", "darkred", "dodgerblue3", "darkslategray4", "gray"), names= c("Biomass Removal", " ", "Biomass Removal/N Addition", "Control", "N Addition", "Rainout"))
+
+library(plotly)
+plot_ly(dfsoli, y=~cla_avg, color=~trt, type="box")
+```
+
+Now let's do this for Andropogon Gerardii:
+```{r echo=FALSE}
+dfange<-filter(CLA, taxa=="ange")
+
+ange1<-aov(cla_avg~diversity, data=dfange)
+summary(ange1)
+#diversity is not important in ange chlorophyll
+
+ange2<-lm(cla_avg~UTM_north, data=dfange)
+summary(ange2)
+#ange chlorophyll is not affected by the soil om gradient
+
+ange3<-aov(cla_avg~trt, data=dfange)
+summary(ange3)
+#ange chlorophyll is significantly affected by treatment
+#plot treatment effects:
+boxplot(cla_avg~trt, data=dfange)
+
+#why is my biomass factor duplicated?
+duplicated(dfsoli)
+```
+
+
+
+
+

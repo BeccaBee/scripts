@@ -1,0 +1,95 @@
+---
+title: "Spatial_Plotting"
+author: "Rebecca Bevans"
+date: "November 26, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Plot my soil data spatially:
+##Online Classroom Wednesday 9/28
+```{r}
+library(tidyverse)
+library(forcats)
+
+soil<-read.csv("~/PRP_thesis/Data/soil_data_prp.csv")
+colnames(soil)
+#this is for a different data set, ignore for this
+#smm$In_Out<-fct_collapse(smm$In_Out, In=c("","in"), Out="out")
+as.data.frame(soil)
+
+soil$Omloi<-as.numeric(soil$Omloi)
+is.numeric(soil$Omloi)
+soil$year<-as.factor(soil$year)
+
+filter(soil, year == "2016") %>%
+  ggplot(aes(x = soil$UTM_east, y = soil$UTM_north) +
+  geom_point(aes(color=Omloi)))
+   
+
+ggplot(smm, aes(x = UTM_east, y=UTM_north) +
+         geom_point(aes(color=Omloi)))
+
+ggplot(smm, aes(x=Omloi)) + geom_histogram()
+
+library(mgcv)
+omgam<-gam(Omloi ~ s(UTM_east, UTM_north), 
+           data=soil)
+summary(omgam)
+#when you add the smooth spline, the two variables explain 25% of the deviance
+plot(omgam)
+#grey dots show locations of readings,  
+plot(omgam, se=FALSE)
+#remove error readings
+gam.check(omgam)
+#you want the Hessian to be positive definite
+#we have significant deviance from normal distribution in the data - especially at the upper end of values. 
+#how do we correct this?
+
+#try log-transformation - 
+ECgam2<-gam(log(Omloi)~ s(UTM_east, UTM_north), 
+           data=soil)
+summary(ECgam2)
+#when log-transformed, deviance explained is much higher (38% vs 25%)
+gam.check(ECgam2)
+```
+
+Project data spatially:
+```{r}
+library(maps)
+library(mapdata)
+library(maptools)  #for shapefiles
+library(scales)  #for transparency
+
+prpplot <- readShapePoly("~/PRP_thesis/Data/PRP_plots_2010.shp.shp")   #layer of data for species range
+
+samps <- read.csv("~/Prp_thesis/Data/soil_data_prp.csv")   #my data for sampling sites, contains a column of "lat" and a column of "lon" with GPS points in decimal degrees
+map("worldHires","usa", xlim=c(-99,-98),ylim=c(40,41), col="gray90", fill=TRUE)  #plot the region of Canada I want
+#map("worldHires","usa", xlim=c(-140,-110),ylim=c(48,64), col="gray95", fill=TRUE, add=TRUE)  #add the adjacent parts of the US; can't forget my homeland
+
+plot(PRP_plots_2010.dbf, add=TRUE, xlim=c(-99,-98),ylim=c(40,41), col=alpha("darkgreen", 0.6), border=FALSE)  #plot the species range
+
+points(samps$lon, samps$lat, pch=19, col="red", cex=0.5)  #plot my sample sites
+```
+
+Read in kml file:
+```{r}
+library(sp)
+library(rgdal)
+read.kml <- function(file, layers) {
+    require(sp)
+    require(rgdal)
+    read.layer <- function (layer_name) {
+        spobj <- rgdal::readOGR(dsn=file, layer=layer_name)
+        coords <- coordinates(spobj)
+        colnames(coords) <- c('x', 'y', 'z')[1:ncol(coords)]
+        df <- data.frame(coords, spobj@data)
+        transform(df, layer=layer_name)
+    }
+    Reduce(rbind, lapply(layers, read.layer))
+}
+read.kml("~PRP_thesis/Data/PRP_plots.kml", layer = base)
+```

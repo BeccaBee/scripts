@@ -1,0 +1,186 @@
+---
+title: "Community analysis"
+author: "Rebecca Bevans"
+date: "October 31, 2016"
+output: html_document
+---
+---
+title: "community analysis practice"
+author: "Rebecca Bevans"
+date: "October 29, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+prp.comm<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/PRP_combined_comm_data.csv")
+```
+
+
+load the picante library and grassland dataset:
+```{r echo=TRUE}
+library(picante)
+class(prp.comm)
+dim(prp.comm)
+head(colnames(prp.comm))
+prp.comm[1:5, 1:5]
+```
+
+the cells contain the percent cover in a sample(quadrat). We should convert these abundance estimates to a relative abundance estimate. 
+```{r}
+#check total abundance /sample
+apply(prp.comm, 1, sum)
+#all of the abundances added together add up to way more than 100% cover!
+
+#turn percent cover to relative abundance by dividing each value by sample total abundance
+comm<-decostand(prp.comm, method = "total")
+apply(comm.presence, 1, sum)
+#now they all add up to 100% Let's see what the transformed data look like:
+comm.presence[1:5, 1:5]
+```
+
+Now load trait data:
+```{r}
+traits<- read.csv("C:/Users/rbevans2/Desktop/grassland_data/species.traits.csv", header=TRUE, row.names=1)
+head(traits)
+pairs(traits)
+#log transform trait variables:
+traits<-log10(traits)
+pairs(traits)
+
+```
+
+Load metadata:
+```{r}
+metadata<- read.csv("C:/Users/rbevans2/Desktop/grassland_data/plot.metadata.csv", header=TRUE, row.names = 1)
+head(metadata)
+```
+
+load phylogenetic data:
+```{r}
+phy<-read.tree("C:/Users/rbevans2/Desktop/grassland_data/grassland.phylogeny.newick")
+class(phy)
+phy
+names(phy)
+Ntip(phy)
+plot(phy, cex = 0.5)
+```
+
+view workspace:
+```{r}
+ls()
+```
+
+check for mismatches or missing species between community, phylogenetic, and trait data:
+```{r}
+combined<-match.phylo.comm(phy, comm)
+phy<-combined$phy
+traits<-combined$data
+
+#check if community data and metadata are in same order
+all.equal(rownames(comm), rownames(metadata))
+```
+
+They all match, but if they didn't we could sort them to the same order: sort metadata rows to be in the same order as community rows:
+```{r}
+metadata<-metadata[rownames(comm),]
+```
+
+Compare species richness between fescue and mixedgrass habitats:
+```{r}
+boxplot(specnumber(comm)~metadata$habitat, ylab = "# of species")
+```
+
+Statistical test of difference:
+```{r}
+#welch's t-test:
+t.test(specnumber(prp.comm)~prp.comm$block)
+```
+
+Did we do good job of sampling the diversity? Use a collector's curve to assess. 
+Plot species accumulation curve across samples:
+```{r}
+plot(specaccum(prp.comm), xlab = "# of samples", ylab = "# of species")
+```
+
+Multivariate community analysis:
+How does the composition vary across samples? How are habitat type and environment related to community composition?
+
+1. Hierarchical clustering:
+cluster communitis that are similar using an agglomerative hierarchichal clustering algorithm:
+```{r}
+#calc. Bray-Curtis distance among samples
+comm.bc.dist<-vegdist(comm, method = "bray")
+#cluster communities using average-linkage algorithm
+comm.bc.clust<-hclust(comm.bc.dist, method = "average")
+#plot cluster diagram
+plot(comm.bc.clust, ylab = "Bray-Curtis dissimilarity")
+
+```
+
+We can see that mixedgrass and fescue habitats contain different plant community types - the two main clusters separate fescue samples from all other samples.
+
+Now run ordination so we can plot the community clusters in ordination space:
+```{r}
+comm.bc.mds<-metaMDS(comm, dist = "bray")
+```
+
+Asssess goodness of ordination fit 
+```{r}
+stressplot(comm.bc.mds)
+```
+
+Plot site scores as text:
+```{r}
+ordiplot(comm.bc.mds, display = "sites", type = "text")
+#automated plotting of results tries to eliminate overlapping labels:
+ordipointlabel(comm.bc.mds)
+```
+
+Now we will customize the plotting area:
+```{r}
+mds.fig<-ordiplot(comm.bc.mds, type = "none")
+```
+
+```{r}
+#plot just the samples, colour by habitat, pch=19 means plot a circle:
+points(mds.fig, "sites", pch = 19, col = "blue", 
+       select = metadata$habitat=="Mixedgrass")
+points(mds.fig, "sites", pch=19, col="blue",
+       select=metadata$habitat=="Mixedgrass")
+#add confidence ellipses around habitat types
+ordiellipse(comm.bc.mds, metadata$habitat, conf = 0.95, label=TRUE)
+#overlay the cluster results calculated earlier
+ordicluster(comm.bc.mds, comm.bc.clust, col="gray")
+```
+
+Now visualize abundance using ordisurf function to fit a smooth surface to estimates of species abundance:
+```{r}
+ordisurf(comm.bc.mds, comm[,"Sphaeralcea_coccinea"], bubble = TRUE, main= "sphaeralcea coccinea abundance", cex=3)
+```
+
+How are environmental variables correlated with the ordination axes?
+```{r}
+ordiplot(comm.bc.mds)
+#calc and plot environmental variable correlations with the axes
+
+#use the subset of metadata that are environmental data
+plot(envfit(comm.bc.mds, metadata[,3:6]))
+```
+
+You can also do a constrained ordination where the environmental data are incorporated directly into the ordination. 
+
+Trait evolution
+Phylogenetic signal is a quantitative measure of the degree to which phylogeny predicts the ecological similarity of species. The K statistic is a measure of phylogenetic signal that compares the observed signal in a trait to the signal under a Brownian motion model of trait evolution on a phylogeny (Blomberg et al. 2003). K values of 1 correspond to a Brownian motion process, which implies some degree of phylogenetic signal or conservatism. K values closer to zero correspond to a random or convergent pattern of evolution, while K values greater than 1 indicate strong phylogenetic signal and conservatism of traits. The statistical significance of phylogenetic signal can be evaluated by comparing observed patterns of the variance of independent contrasts of the trait to a null model of shuffling taxa labels across the tips of the phylogeny. These tests are implemented in the Kcalc, phylosignal, and multiPhylosignal functions.
+
+Measure phylogenetic signal in these data:
+```{r}
+#apply Kcalc function to each column in the data frame
+apply(traits, 2, Kcalc, phy)
+#this didn't work
+#convert tree to be dichotomous before calculating P-values
+multiPhylosignal(traits, multi2di(phy))
+#none of this is working, I'll get back to it
+```
+
+

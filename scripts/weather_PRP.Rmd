@@ -1,0 +1,30 @@
+---
+title: "Weather"
+author: "Becca"
+date: "January 13, 2017"
+output: html_document
+---
+Load data
+```{r }
+weather<-read.csv("P:/Research/Thesis/PRP_thesis/Data/weather_data.csv", header=TRUE)
+View(weather)
+```
+
+Plot temperatures by year:
+```{r }
+
+alltemps<-ggplot(weather, aes(x=DATE, y=TEMP.avg), color=YEAR)
+alltemps + geom_point()
+
+x<-subset(weather, YEAR==2015)
+
+temps<- ggplot(x, aes(x = DATE, y = TEMP.avg))
+temps + geom_point() +
+  stat_smooth() + theme_bw() +
+  scale_colour_brewer(name = 'Trendline', palette = 'Set2')
+
+y<-subset(weather, YEAR==2016)
+
+tempsy<-ggplot(y, aes(x=DATE, y=TEMP.avg))
+tempsy + geom_point() + geom_smooth()
+```

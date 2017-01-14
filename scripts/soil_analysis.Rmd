@@ -1,0 +1,52 @@
+---
+title: "Soil"
+author: "Rebecca Bevans"
+date: "November 27, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries and data:
+```{r}
+library(tidyverse)
+library(picante)
+library(mgcv)
+soil<-read.csv("~/PRP_thesis/Data/soil.csv")
+colnames(soil)
+#this is for a different data set, ignore for this
+#smm$In_Out<-fct_collapse(smm$In_Out, In=c("","in"), Out="out")
+as.data.frame(soil)
+
+soil$Omloi<-as.numeric(soil$Omloi)
+is.numeric(soil$Omloi)
+soil$year<-as.factor(soil$year)
+
+```
+
+Plot soil OM as function of location:
+```{r}
+OM<-lm(Omloi ~ UTM_north + UTM_east + UTM_north:UTM_east, data=soil)
+summary(OM)
+OM1<-drop1(OM)
+summary(OM1)
+OM1<-lm(Omloi ~ UTM_north +UTM_east, data=soil)
+plot(OM1)
+summary(OM1)
+OM2<-lm(Omloi ~ UTM_north, data = soil)
+summary(OM2)
+plot(OM2)
+
+OM3<-gam(Omloi ~ s(UTM_north), data = soil)
+summary(OM3)
+write.pdf(summary(OM3), file = "~/PRP_thesis/Data/Graphs.pdf")
+
+```
+
+Plot soil OM as function of diversity:
+```{r}
+
+```
+

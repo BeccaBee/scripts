@@ -1,0 +1,242 @@
+---
+title: "Bareground"
+author: "Rebecca Bevans"
+date: "November 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+load data and packages:
+```{r}
+metadata<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.metadata11.7.16.csv")
+comm<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.comm11.7.16.csv", row.names=1)
+library(tidyverse)
+library(broom)
+library(ggplot2)
+colnames(metadata)
+```
+
+Convert cover classes to midpoints
+```{r}
+cover<-metadata
+write.csv(cover, file = "cover_data.csv")
+
+cover$bare[metadata$bare==1] <- 3.0      # to convert class 1 to midpoint of 3.0 percent
+cover$bare[metadata$bare==2] <- 15.0     # to convert class 2 to midpoint of 15.0 percent
+cover$bare[metadata$bare==3] <- 37.5     # to convert class 3 to midpoint of 37.5 percent
+cover$bare[metadata$bare==4] <- 62.5     # to convert class 4 to midpoint of 62.5 percent
+cover$bare[metadata$bare==5] <- 85.0     # to convert class 5 to midpoint of 85.0 percent
+cover$bare[metadata$bare==6] <- 97.5     # to convert class 6 to midpoint of 97.5 percent
+
+cover[1:5, 1:10]
+```
+
+Convert litter cover classes to midpoints:
+```{r}
+cover$litter[metadata$litter==1] <- 3.0      # to convert class 1 to midpoint of 3.0 percent
+cover$litter[metadata$litter==2] <- 15.0     # to convert class 2 to midpoint of 15.0 percent
+cover$litter[metadata$litter==3] <- 37.5     # to convert class 3 to midpoint of 37.5 percent
+cover$litter[metadata$litter==4] <- 62.5     # to convert class 4 to midpoint of 62.5 percent
+cover$litter[metadata$litter==5] <- 85.0     # to convert class 5 to midpoint of 85.0 percent
+cover$litter[metadata$litter==6] <- 97.5     # to convert class 6 to midpoint of 97.5 percent
+
+cover[1:5, 1:10]
+```
+Create 'unit' variable to allow for grouping of quadrats:
+```{r}
+cover$unit<-paste(cover$block, cover$level, cover$diversity, cover$transect)
+```
+
+compare bare between years, diversity, treatments:
+```{r}
+library(picante)
+cover<-read.csv("~/PRP_thesis/Data/cover.csv", header = TRUE, row.names = 2)
+as.factor(cover$diversity)
+boxplot(bare ~ diversity + year, cover, xlab="diversity", ylab="percent bareground", col=c('goldenrod', 'cornflowerblue'))
+
+boxplot(bare~block:level, data=cover)
+
+boxplot(bare~year, data=cover, xlab="Year", ylab="Percent Bareground", notch=TRUE, 
+        col=c('goldenrod', 'aquamarine'))
+
+boxplot(bare~unit, data=cover)
+
+#now same for litter:
+boxplot(litter~diversity, data = cover)
+boxplot(litter~block:level, data = cover)
+boxplot(litter~unit, data=cover)
+boxplot(litter~year, data=cover)
+fit<-aov(litter~treat + unit, data=cover)
+summary(fit)
+boxplot(litter~treat+unit, data=cover)
+#barplot grouping bareground by year and diversity 
+#cover$yrbare<-aggregate(cover$bare, by=list(cover$year), FUN=mean)
+
+#barplot(barecount, main="Percent Bareground",
+#        xlab = "bareground",
+#        legend = rownames(barecount))
+```
+
+subset years to see if there is significant difference within years based on treatment type:
+```{r}
+library(pander)
+barecount<-subset(cover, year==2015 & treat==c('biomass', 'biomass_nitrogen','control', 'rainout','nitrogen'))
+barecount16<-subset(cover, year==2016 & treat==c('biomass', 'biomass_nitrogen','control', 'rainout','nitrogen'))
+
+fit2<-aov(bare~treat, data=cover)
+fit3<-aov(bare~treat, data=barecount)
+fit4<-aov(bare~treat, data=barecount16)
+
+pander(fit2)
+pander(fit3)
+pander(fit4)
+
+
+library(faraway)
+library(tidyverse)
+library(MASS)
+bare15<-lm(bare~treat + unit + treat:unit, data=barecount)
+summary(bare15)
+pander(bare15)
+
+fillCols<-c(biomass='cornflowerblue', control='indianred4', nitrogen='olivedrab', biomass_nitrogen='coral1', rainout='darkgoldenrod1', no='burlywood')
+myPanel.bwplot <- function(x=x, y=y, ...) {
+    fill <- fillCols[intersect(levels(x), unique(x))] 
+    panel.bwplot(x=x, y=y, ..., groups=Col5, fill=fill)
+}
+
+library(lattice)
+bwplot(bare ~ treat | factor(year), barecount)
+bwplot(bare ~ treat | factor(year), barecount16)
+
+bare1<-gam(bare~treat+diversity+treat:diversity, data=barecount)
+bare2<-gam(bare~treat+diversity+treat:diversity, data=barecount16)
+
+summary(bare1)
+summary(bare2)
+tibble(bare1)
+pander(bare2)  
+
+plot(bare~treat | factor(unit), barecount)
+bwplot(bare~treat | factor(diversity), barecount16, panel=myPanel.bwplot)
+bwplot(bare~treat | factor(diversity), barecount, panel=myPanel.bwplot)
+aov(bare~treat)
+
+
+
+#library(mgcv)
+#M1 <- gam(bare~ treat| year,data=cover)
+#summary(M1)
+#plot(M1)
+
+cover_data<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/Rdata/cover_data.csv", row.names=1)
+rownames(comm)
+rownames(cover_data)
+cover_data<-cover_data[rownames(comm),]
+
+library(vegan)
+all.equal(rownames(comm), rownames(cover_data))
+plots<-diversity(comm, index = "shannon")
+summary(plots)
+median(plots)
+mean(plots)
+coverbase <- ggplot(cover, aes(x = specnumber(comm), y =cover_data$bare)) +
+  geom_point(aes(color = unit)) + 
+  scale_color_discrete() + labs(x = "diversity", y = "bare")
+coverbase + geom_smooth(method = "lm") + facet_wrap(~year) + guides(color = FALSE)
+
+
+bwplot(specnumber(comm)~treat | factor(unit), cover_data)
+
+```
+
+Subset data frames to get separate data frames for wholeplot and subplot
+```{r}
+##wholeplot first:
+combine.comm.cover<-cbind.data.frame(comm, cover_data, deparse.level=1)
+
+wholeplot<-subset(cover_data, cover_data$transect == 'O1'| cover_data$transect=='O2'|cover_data$transect=='O3'| cover_data$transect=='O4', select=c(1:10))
+wholeplot.comm<-subset(combine.comm.cover, combine.comm.cover$transect=='O1'| combine.comm.cover$transect=='O2'|combine.comm.cover$transect=='O3'|combine.comm.cover$transect=='O4', select=1:138)
+
+all.equal(rownames(wholeplot), rownames(wholeplot.comm))
+
+##subplots:
+subplot<-subset(cover_data, cover_data$transect == 'D1'| cover_data$transect=='D2'|cover_data$transect=='D3'| cover_data$transect=='D4' | cover_data$transect=='C1'|cover_data$transect=='C2', select=c(1:10))
+
+subplot.comm<-subset(combine.comm.cover, combine.comm.cover$transect=='D1'|combine.comm.cover$transect=='D2'|combine.comm.cover$transect=='D3'|combine.comm.cover$transect=='D4'|combine.comm.cover$transect=='C1'|combine.comm.cover$transect=='C2', select=1:138)
+
+all.equal(rownames(subplot), rownames(subplot.comm))
+```
+
+Now compare transect diversity at both scales:
+```{r}
+wholeplot$replicate<-paste(wholeplot$block, wholeplot$level)
+subplot$replicate<-paste(subplot$block, subplot$level)
+wholeplot$bare<-as.numeric(wholeplot$bare)
+wholeplot.bare<-xyplot(bare ~ specnumber(wholeplot.comm) | factor(replicate), wholeplot)
+wholeplot.bare
+whole.bare <- ggplot(wholeplot, aes(x = specnumber(wholeplot.comm), y =wholeplot$bare)) +
+  geom_point(aes(color = unit)) + 
+  scale_color_discrete() + labs(x = "diversity", y = "bare")
+coverbase + geom_smooth(method = "lm") + facet_wrap(~year) + guides(color = FALSE)
+
+####initial assessment of effects showing that both replicate and year have a significant impact on bareground, but not the treatment type, or a combination of replicate and treatment. 
+subplot.effects<-aov(bare~replicate+year+treat+replicate:treat, data=subplot)
+summary(subplot.effects)
+##now try with an interaction term for year and treatment:
+subplot.effect2<-aov(bare~replicate+year+treat+year:treat, data=subplot)
+summary(subplot.effect2)
+
+##check if differences become significant when replicate is used as a blocking factor:
+subplot.effect3<-aov(bare~diversity+year+treat+diversity:year, data=subplot)
+summary(subplot.effect3)
+#diversity and year both play significant role. Divide among the two diversity levels:
+ld.subplot<-subset(subplot, diversity==1)  
+subplot.effect4<-aov(bare~treat, data=ld.subplot)
+summary(subplot.effect4)
+
+hd.subplot<-subset(subplot, diversity==2)
+subplot.effect5<-aov(bare~treat, data=hd.subplot)
+summary(subplot.effect5)
+#closer to being significant, but still not statistically significant difference
+
+subplot.effect6<-gam(bare~treat+year+diversity+treat:year, data=subplot)
+summary(subplot.effect6)
+#a low amount of deviance (37.5%) is explained by this model. I am missing something.
+```
+
+
+```{r}
+
+library(doBy)
+summaryBy(mpg + wt ~ cyl + vs, data = mtcars,
+  FUN = function(x) { c(m = mean(x), s = sd(x)) } )
+# produces mpg.m wt.m mpg.s wt.s for each
+# combination of the levels of cyl and vs
+bare2015<-subset(cover, year==2015)
+bare.stats<-summaryBy(bare ~ diversity, data=bare2015,
+          FUN=function(x)  { c(m = mean(x), s = sd(x)) } )
+pander(bare.stats)
+bare2016<-subset(cover, year==2016)
+bare.stats2<-summaryBy(bare ~ diversity, data=bare2016,
+          FUN=function(x)  { c(m = mean(x), s = sd(x)) } )
+pander(bare.stats2)
+```
+
+```{r}
+
+means <- aggregate(bare ~  treat, bare2016, mean)
+
+library(ggplot2)
+ggplot(data=bare2016, aes(x=treat, y=bare, fill=treat)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="indianred4", geom="point", 
+               shape=18, size=3,show.legend = FALSE) + 
+  geom_text(data = means, aes(label = bare, y = bare + 0.08))
+
+means2<-aggregate(bare ~ diversity, bare2015, mean, na.rm=TRUE)
+summary(means2)
+```
+

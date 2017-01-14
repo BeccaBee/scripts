@@ -1,0 +1,54 @@
+---
+title: "cla_explore"
+author: "Rebecca Bevans"
+date: "October 20, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r echo=FALSE}
+cla2<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/cla_2016_corrected2.csv")
+library(tidyverse)
+library(broom)
+library(plotly)
+library(ggplot2)
+head(cla2)
+```
+
+
+```{r echo=FALSE}
+
+
+fitcla<-aov(cla~taxa, data=cla2)
+summary(fitcla)
+
+ggplot(cla2, aes(x=taxa, y=cla))+ 
+  geom_point(size = 2)
+
+boxplot(cla~taxa, data=cla2)
+
+```
+
+```{r echo=FALSE}
+angeAvg<-summarize(mean(cla2$ange_HD))
+
+summarize(cla2, avg = mean(cla2$ange_HD))
+
+angeLDavg<-filter(cla2, taxa == "ange_LD")
+head(angeavg)
+LDavg<-mean(angeLDavg$cla, data=angeLDavg)
+summary(LDavg)
+boxplot(cla~UTM_north+UTM_east, data=angeLDavg)
+plot(cla~UTM_north, data=angeLDavg)
+
+angeHDavg<-filter(cla2, taxa =="ange_HD")
+head(angeHDavg)
+
+
+
+```
+

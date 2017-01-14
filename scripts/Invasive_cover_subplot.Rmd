@@ -1,0 +1,54 @@
+---
+title: "Invasive_cover"
+author: "Rebecca Bevans"
+date: "November 27, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load data and libraries:
+```{r}
+library(tidyverse)
+library(picante)
+comm  #if this isn't loaded yet, load the comm.csv file from the Data folder
+meta<-meta_data #if this isn't loaded yet load the meta_data.csv file from Data folder
+colnames(comm)
+```
+
+Plot cover of invasive species Brominermis and Bromjapon:
+```{r}
+#get subset of invader data
+invaders<-subset(comm, select = c(Brominermis , Bromjapon, Poaprat, Elytra, Cornussp, Calacan, Cirarve, Cirvulg, Coniummac, Desmocana, Hordejub)) 
+colnames(invaders)
+
+invadercover<-aggregate(cbind(Brominermis , Bromjapon, Poaprat, Elytra, Cornussp, Calacan, Cirarve, Cirvulg, Coniummac, Desmocana, Hordejub) ~ meta$year+ meta$diversity, data = invaders, FUN=mean, na.rm = FALSE)
+
+meta$inv=paste(meta$diversity, meta$unit, meta$transect)
+Brominermis.cover<-aggregate(invaders$Brominermis, by = list(meta$inv), FUN = mean, na.rm = FALSE) 
+as.data.frame(Brominermis.cover)
+as.factor(Brominermis.cover$Group)
+
+library(lattice)
+inv<-aov(x ~ Group.1, data = Brominermis.cover)
+summary(inv)
+invplot<-xyplot(x ~ Group.1, data=Brominermis.cover)
+
+#try with each species
+Bromjapon.cover<-aggregate(invaders$Bromjapon, by = list (meta$diversity, meta$unit, meta$transect), FUN=mean, na.rm = FALSE)
+inv1<-aov(x ~ Group.1, data = Bromjapon.cover)
+summary(inv1)
+
+
+Cirarve.cover<-aggregate(invaders$Cirarve, by = list(meta$diversity, meta$unit, meta$transect), FUN=mean, na.rm = FALSE)
+inv2<-aov(x ~ Group.1, data = Cirarve.cover)
+summary(inv2)
+
+#try aggregating these three together:
+all.inv.cover<-cbind(Brominermis.cover, Bromjapon.cover, Cirarve.cover, by =)
+
+
+```
+

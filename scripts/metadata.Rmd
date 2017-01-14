@@ -1,0 +1,31 @@
+---
+title: "Metadata"
+author: "Rebecca Bevans"
+date: "November 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load library:
+```{r}
+library(tidyverse)
+```
+
+Load metadata and community dataframes:
+```{r}
+prp.community<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.community11.7.16.csv")
+meta<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.meta11.7.16.csv")
+```
+
+Combine metadata with community data by 'site':
+```{r}
+library(data.table)
+dt1<-data.table(prp.community, key="site")
+dt2<-data.table(meta, key="site")
+prp.community.meta<-dt1[dt2]
+write.csv(prp.community.meta, file = "C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.community.meta.csv", row.names = FALSE)
+```
+
+

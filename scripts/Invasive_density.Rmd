@@ -1,0 +1,397 @@
+---
+title: "Bevans_Final_Project"
+author: "Rebecca Bevans"
+date: "December 13, 2016"
+output: word_document
+---
+
+This code can be used to reproduce the analyses and figures created for Rebecca Bevans' Ecostats final project (fall 2016): "Biodiversity, Resource Availability, and Invasion Density" in R studio. 
+
+Load data and packages:
+```{r}
+library(tidyverse)
+library(nlme)
+library(picante)
+library(AICcmodavg)
+library(lme4)
+library(labdsv)
+invsoil<-read.csv("~/PRP_thesis/Data/invsoil.csv", header=TRUE, row.names=1)
+```
+
+Test correlations among variables:
+```{r}
+library(GGally)
+ggpairs(invsoil)
+#77.5% correlation between individual Omloi and avg.c
+#66.7% correlation between individual kclN and avg.n
+#9.5% correlation between avg.c and avg.n
+#-19.9%correlation between avg.n and diversity
+#5.07% corr between avg.c and diversity
+#some significant variation between plot position and soilOM and N; this should be accounted for by using block as random effects variable
+```
+
+Build model sets:
+```{r}
+#Global model using indexes
+all<-lmer(all.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + avg.c*avg.n + (1|rep), data=invsoil, REML=FALSE)
+summary(all)
+plot(resid(all))
+drop1(all, test="Chisq")
+
+all1.1<-lmer(all.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + (1|rep), data=invsoil, REML=FALSE)
+summary(all1.1)
+drop1(all1.1, test="Chisq")
+
+all1.2<-lmer(all.index ~ avg.c + diversity + avg.c:diversity + (1|rep), data=invsoil, REML=FALSE)
+summary(all1.2)
+
+
+all1<-lmer(all.index ~ avg.c + avg.n + diversity + avg.n*diversity + avg.c*avg.n + (1|invsoil$rep), data=invsoil, REML=FALSE)
+summary(all1)
+plot(resid(all1))
+drop1(all1, test="Chisq")
+anova(all1, all1.1, test="F")
+
+all2<-lmer(all.index ~ avg.c + avg.n + diversity + avg.n*diversity + (1|invsoil$rep), data=invsoil, REML=FALSE)
+summary(all2)
+plot(resid(all2))
+anova(all1, all2, test="F")
+anova(all, all2, test="F")
+drop1(all2, test="Chisq")
+
+all3<-lmer(all.index ~ avg.n + avg.n*diversity + (1|rep), data=invsoil, REML=FALSE)
+summary(all3)
+anova(all1.2, all3, test="F")
+drop1(all3, test="Chisq")
+#The all3 model is the best for all invaders overall. Though it is hardly predictive. It's pretty bad. 
+
+all4<-lmer(all.index ~ (1|rep), data=invsoil, REML=FALSE)
+summary(all4)
+anova(all1.2, all4, test="F")
+anova(all1.2, all4)
+#Test for woody invaders alone:
+lmwoody<-lmer(woody.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + avg.c*avg.n + (1|block/level), data=invsoil, REML=FALSE)
+summary(lmwoody)
+plot(resid(lmwoody))
+
+drop1(lmwoody)
+
+lmwoody2<-lmer(woody.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + (1|block/level), data=invsoil, REML=FALSE)
+summary(lmwoody2)
+plot(resid(lmwoody2))
+drop1(lmwoody2)
+
+anova(lmwoody, lmwoody2, test="F")
+
+lmwoody3<-lmer(woody.index ~ avg.c + avg.n + diversity + avg.c*diversity + (1|block/level), data=invsoil, REML=FALSE)
+  
+summary(lmwoody3)
+drop1(lmwoody3)
+plot(resid(lmwoody3))
+anova(lmwoody2, lmwoody3, test="F")
+#Best model is lmwoody3; difference in model weights between lmwoody3 and lmwoody4 is not statistically significant.
+
+lmwoody4<-lmer(woody.index ~ avg.c + avg.n + diversity + (1|invsoil$rep), data=invsoil, REML=FALSE)
+
+summary(lmwoody4)
+
+anova(lmwoody3, lmwoody4, test="F")
+
+
+#Test for thistles only:
+thistle<-lmer(cirsium.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + avg.c*avg.n + (1|invsoil$rep), data=invsoil, REML=FALSE)
+summary(thistle)
+plot(resid(thistle))
+drop1(thistle, test="Chisq")
+
+thistle2<-lmer(cirsium.index ~ avg.c + avg.n + diversity + avg.c*diversity + avg.n*diversity + (1|invsoil$rep), data=invsoil, REML=FALSE)
+summary(thistle2)
+plot(resid(thistle2))
+drop1(thistle2, test="Chisq")
+
+thistle3<-lmer(cirsium.index ~ avg.c + avg.n + diversity + avg.c*diversity + (1|invsoil$rep), data=invsoil, REML=FALSE)
+summary(thistle3)
+plot(resid(thistle3))
+drop1(thistle3, test="Chisq")
+#thistle3 is the best fitting model
+
+```
+
+
+Graphics:
+```{r}
+library(ggplot2)
+library(gridExtra)
+#correlation between OM and invasive density
+#all invaders
+oplot<-ggplot(invsoil, aes(x=avg.c, y=all.index))
+oplot + geom_point() + geom_smooth()
+o<-oplot + geom_point() + geom_smooth()
+
+#woody invaders only
+woplot<-ggplot(invsoil, aes(x=avg.c, y=woody.index))
+woplot +geom_point() + geom_smooth()
+wo<-woplot +geom_point() + geom_smooth()
+
+#thistles
+toplot<-ggplot(invsoil, aes(x=avg.c, y=cirsium.index))
+toplot + geom_point() + geom_smooth()
+to<-toplot+geom_point() +geom_smooth()
+#all on same page:
+grid.arrange(o, wo, to, ncol=1)
+
+
+#correlation between N and invasive density
+#all invaders
+nplot<-ggplot(invsoil, aes(x=avg.n, y=all.index))
+nplot + geom_point() + geom_smooth()
+n<-nplot + geom_point() + geom_smooth()
+
+#woody invaders only
+wnplot<-ggplot(invsoil, aes(x=avg.n, y=woody.index))
+wnplot +geom_point() + geom_smooth()
+w<-wnplot +geom_point() + geom_smooth()
+
+#thistles
+tnplot<-ggplot(invsoil, aes(x=avg.n, y=cirsium.index))
+tnplot + geom_point() + geom_smooth()
+t<-tnplot+geom_point() +geom_smooth()
+#all on same page:
+grid.arrange(n, w, t, ncol=1)
+
+###
+#correlation (bwplot) between diversity and invasive density
+dplot<-ggplot(invsoil, aes(x=factor(diversity), y=all.index))
+dplot + geom_boxplot()
+d<-dplot + geom_boxplot()
+
+wdplot<-ggplot(invsoil, aes(x=factor(diversity), y=woody.index))
+wdplot + geom_boxplot()
+wd<-wdplot + geom_boxplot()
+
+tdplot<-ggplot(invsoil, aes(x=factor(diversity), y=cirsium.index))
+tdplot + geom_boxplot()
+td<-tdplot + geom_boxplot()
+
+#all in same image
+grid.arrange(d, wd, td, ncol=1)
+```
+
+Linear interaction graphics:
+```{r}
+#graphics theme - APA style
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line())
+        
+
+#Average Nxdiversity effect on total invasion:
+dat=invsoil
+dat$diversity=as.factor(dat$diversity)
+nmod<-glm(all.index~avg.n*diversity, data=dat)
+dat$predicted<-predict(nmod)
+#all3 lmer: all.index ~ avg.n + avg.n*diversity + (1|rep)
+#make diversity a discrete variable for plotting
+
+
+
+#plot scatterplot with fit lines
+p=ggplot(dat, aes(x=avg.n, y=all.index, shape=diversity))+
+geom_point()+
+scale_shape_manual(values=c(1,0.2,16), name='Diversity', labels=c('LD','MD','HD'))+
+geom_line(aes(x = avg.n, y = predicted, linetype=diversity))+
+scale_linetype_discrete(name='Diversity', labels=c('LD','MD', 'HD'))+
+labs(x = 'Average Soil N', y = 'Total Invasion Density')+apatheme
+p
+
+
+#do it with just thistles
+dat=invsoil
+dat$diversity<-as.factor(dat$diversity)
+nmod2<-glm(cirsium.index~avg.n*diversity, data=dat)
+dat$pred<-predict(nmod2)
+#plot scatterplot with fit lines
+p1.1=ggplot(dat, aes(x=avg.n, y=cirsium.index, shape=diversity))+
+geom_point()+
+scale_shape_manual(values=c(1,0.2,16), name='Diversity', labels=c('LD','MD','HD'))+
+geom_line(aes(x = avg.n, y = pred, linetype=diversity))+
+scale_linetype_discrete(name='Diversity', labels=c('LD','MD', 'HD'))+
+labs(x = 'Average Soil N', y = 'Thistle Invasion Density')+apatheme
+p1.1
+
+
+#do it with just woody
+dat=invsoil
+dat$diversity<-as.factor(dat$diversity)
+nmod3<-glm(woody.index~avg.n*diversity, data=dat)
+dat$pred<-predict(nmod3)
+#plot scatterplot with fit lines
+p1.2=ggplot(dat, aes(x=avg.n, y=woody.index, shape=diversity))+
+geom_point()+
+scale_shape_manual(values=c(1,0.2,16), name='Diversity', labels=c('LD','MD','HD'))+
+geom_line(aes(x = avg.n, y = pred, linetype=diversity))+
+scale_linetype_discrete(name='Diversity', labels=c('LD','MD', 'HD'))+
+labs(x = 'Average Soil N', y = 'Woody Invasion Density')+apatheme
+p1.2
+
+#Average C*diversity effect on thistle invasion:
+dat=invsoil
+predt<-glm(cirsium.index~avg.c*diversity, data=dat)
+dat$predt<-predict(predt)
+#all3 lmer: all.index ~ avg.n + avg.n*diversity + (1|rep)
+#make diversity a discrete variable for plotting
+dat$diversity<-as.factor(dat$diversity)
+
+#plot scatterplot with fit lines
+p=ggplot(dat, aes(x=avg.c, y=cirsium.index, shape=diversity))+
+geom_point()+
+scale_shape_manual(values=c(1,0.2,16), name='Diversity', labels=c('LD','MD','HD'))+
+geom_line(aes(x = avg.c, y = predt, linetype=diversity))+
+scale_linetype_discrete(name='Diversity', labels=c('LD','MD', 'HD'))+
+labs(x = 'Average Soil OM', y = 'Thistle Invasion Density')+ apatheme
+p
+
+```
+
+
+Barplot graphics code:
+```{r}
+library(psych)
+#p1 data
+dat<-invsoil
+dat$diversity=as.factor(dat$diversity)
+dat$avg.c=as.factor(dat$avg.c)
+dat2<-describeBy(dat$woody.index, list(dat$diversity), mat=TRUE, digits=3)
+names(dat2)[names(dat2)=='group1']= 'Diversity'
+
+
+dat2$se=dat2$sd/sqrt(dat2$n)
+
+#plot layout
+limits = aes(ymax = mean + (1.96*se), ymin=mean - (1.96*se))
+ 
+dodge = position_dodge(width=0.9)
+ 
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line())
+
+give.n<-function(x){
+  return(c(y=mean(x), label=length(x)))
+}
+
+#plot the interaction
+p1<-ggplot(dat2, aes(x=Diversity, y=mean, fill=Diversity))+
+  geom_bar(stat='identity', position=dodge)+
+  geom_errorbar(limits, position=dodge, width=0.25)+
+  ylab('Mean Shrub Density')+
+  scale_fill_grey()
+p1
+
+#thistle invasion by diversity
+dat<-invsoil
+dat$diversity=as.factor(dat$diversity)
+dat$cirsium.index=as.numeric(dat$cirsium.index)
+dat3<-describeBy(dat$cirsium.index, list(dat$diversity), mat=TRUE, digits=3)
+names(dat3)[names(dat3)=='group1']= 'Diversity'
+
+dat3$se=dat3$sd/sqrt(dat3$n)
+
+p2<-ggplot(dat3, aes(x=Diversity, y=mean, fill=Diversity))+
+geom_bar(stat='identity', position=dodge)+
+  geom_errorbar(limits, position=dodge, width=0.25)+
+  ylab('Mean Thistle Density')+
+  scale_fill_grey() 
+p2
+
+#all invasion by diversity
+dat<-invsoil
+dat$diversity=as.factor(dat$diversity)
+dat4<-describeBy(dat$all.index, list(dat$diversity), mat=TRUE, digits=3)
+names(dat4)[names(dat4)=='group1']= 'Diversity'
+
+dat4$se=dat4$sd/sqrt(dat4$n)
+
+p3<-ggplot(dat4, aes(x=Diversity, y=mean, fill=Diversity))+
+geom_bar(stat='identity', position=dodge)+
+  geom_errorbar(limits, position=dodge, width=0.25)+
+  ylab('Mean Invader Density')+
+  scale_fill_grey() 
+p3
+#p1 and p2 on same plot:
+grid.arrange(p1, p2, p3, ncol=3)
+
+#tdplot<-ggplot(invsoil, aes(x=factor(diversity), #y=cirsium.index))
+#tdplot + geom_boxplot()
+#td<-tdplot + geom_boxplot()
+```
+
+
+ANOVAs for combined fixed and random factors:
+```{r}
+library(nlme)
+library(lmerTest)
+
+#for cirsium species
+z <- lme(cirsium.index ~ diversity*avg.c, random = ~ 1|rep, data = invsoil) # nlme package
+z <- lmer(cirsium.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+plot(z)
+dat=invsoil
+
+#model-based fitted means for treatments:
+lsmeans(z, c("diversity", "avg.c"))
+lsmeans(z, c("diversity"))
+az<-anova(z)
+az
+#boxplot
+dat=invsoil
+dat$diversity=as.factor(dat$diversity)
+dat$predaz=predict(z)  
+zplot<-ggplot(data=dat, aes(x=diversity, y=predaz, fill=diversity)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Diversity", y="Thistle Invasion by diversity*soil OM + BlockID.rand.eff.")
+zplot
+
+
+###for woody invaders
+z2 <- lme(woody.index ~ diversity*avg.c, random = ~ 1|rep, data = invsoil) # nlme package
+z2 <- lmer(woody.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+plot(z2)
+dat=invsoil
+dat$diversity=as.factor(dat$diversity)
+#model-based fitted means for treatments:
+lsmeans(z2, c("diversity", "avg.c"))
+lsmeans(z2, c("diversity"))
+az2<-anova(z2)
+az2
+
+#boxplot
+dat$predaz2=predict(z2)  
+zplot2<-ggplot(data=dat, aes(x=diversity, y=predaz2, fill=diversity)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Diversity", y="Woody Invasion by diversity*soil OM + BlockID.rand.eff.")
+zplot2
+
+
+###for all invaders
+z1 <- lme(all.index ~ diversity*avg.c, random = ~ 1|rep, data = invsoil) # nlme package
+z1 <- lmer(all.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+plot(z)
+dat=invsoil
+
+#model-based fitted means for treatments:
+lsmeans(z, c("diversity", "avg.c"))
+lsmeans(z, c("diversity"))
+az1<-anova(z1)
+az1
+
+#boxplot
+dat$diversity=as.factor(dat$diversity)
+dat$predaz1=predict(z1)  
+zplot1<-ggplot(data=dat, aes(x=diversity, y=predaz1, fill=diversity)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Diversity", y="Total Invasion by diversity*soil OM + BlockID.rand.eff.")
+zplot1
+
+
+#plot all 3 together:
+grid.arrange(zplot1, zplot, zplot2, ncol=3)
+```

@@ -1,0 +1,427 @@
+---
+title: "SLA_analysis"
+author: "Becca"
+date: "January 9, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Load data and arrange weight and area datasets to match. 
+```{r echo=FALSE}
+#read in sla weight file and add column "unit"
+
+#sla_weight<-read.csv("P:/Research/Thesis/PRP_thesis/Data/sla_2016_weight.csv", header=TRUE)
+#sla_weight<-sla_weight[c(-11,-12,-13,-14,-15,-16)]
+#View(sla_weight)
+#sla_weight$unit<-paste(sla_weight$block, sla_weight$level, sla_weight$transect, sla_weight$quadrat, sla_weight$taxa, sla_weight$replicate)
+#write.csv(sla_weight, file="P:/Research/Thesis/PRP_thesis/Data/sla_weight.csv")
+
+#read in sla area file and add column "unit"
+#sla_area<-read.csv("P:/Research/Thesis/PRP_thesis/Data/SLA_2016_area.csv", header=TRUE)
+#View(sla_area)
+#sla_area<-sla_area[c(-11)]
+#sla_area$unit<-paste(sla_area$block, sla_area$level, sla_area$transect, sla_area$quadrat, sla_area$taxa, sla_area$replicate)
+#write.csv(sla_area, file = "P:/Research/Thesis/PRP_thesis/Data/sla_area.csv")
+
+#sort to match
+#sla<-merge(sla_area, sla_weight, by="unit")
+#View(sla)
+#write.csv(sla, file="P:/Research/Thesis/PRP_thesis/Data/sla.csv")
+
+sla<-read.csv("P:/Research/Thesis/PRP_thesis/Data/sla.csv", header=TRUE)
+View(sla)
+```
+Yay! All organized!
+
+2.Load libraries
+```{r echo=FALSE}
+
+library(ggplot2)
+library(tidyverse)
+library(picante)
+library(Ggally)
+library(lattice)
+#install.packages('data.table') #may need to be run if you don't have the package
+library(data.table)
+library(lmerTest)
+library(MASS)
+#install.packages('pander')
+library(pander)
+```
+
+3. Create SLA metric (area/weight, for unit sLA)
+```{r echo=FALSE}
+#make area and weight numeric
+#sla$area.cm = as.numeric(sla$area.cm)
+#sla$weight.0.00g = as.numeric(sla$weight.0.00g)
+#sla<-transform(sla, leaf.sla=sla$area.cm/sla$weight.0.00g)
+#View(sla)
+#sla$leaf.sla<-as.numeric(sla$leaf.sla)
+#write.csv(sla, file = "P:/Research/Thesis/PRP_thesis/Data/sla.csv")
+```
+
+3. Screen data for differences by species, treatment, diversity, and look for outliers or non-heterogenous residuals.
+```{r echo=FALSE}
+#box and whisker plots of specific leaf area by diversity, treatment and species
+sla$diversity = as.factor(sla$diversity)
+bwplot( ~leaf.sla | diversity, data=sla)
+divplot<-ggplot(sla, aes(x=diversity, y=leaf.sla))
+divplot + geom_boxplot()
+bwplot( ~leaf.sla | taxa, data = sla)
+#SOCA, ANGE, and Solidago have the biggest variance. MOFI is pretty tightly grouped, as are HEPA and HEMAX. These should provide good data. ANGE appears to have a significant outlier. Let's find it:
+ange.sla<-subset(sla, taxa=="ANGE")
+ange.sla$level=as.numeric(ange.sla$level)
+ange.sla$leaf.sla=as.numeric(ange.sla$leaf.sla)
+angesla<-ggplot(aes(x=paste(ange.sla$block, ange.sla$level), y=leaf.sla), data=ange.sla)
+angesla + geom_point()
+
+#C4D1ANGE4 is the major outlier - let's take it out and see if the data becomes closer together:
+
+
+#write a formula to remove outliers
+outlierReplace<-function(dataframe, cols, rows, newValue = NA) {
+    if (any(rows)) {
+        set(dataframe, rows, cols, newValue)
+    }
+}
+
+#now remove ouliers from the dataset
+my_data<-sla
+#View(my_data)
+outlierReplace(my_data, "leaf.sla", 
+      which(my_data$leaf.sla > 600), NA)
+
+qplot(data = my_data, x = leaf.sla) + ylab("Number of Samples")
+
+write.csv(my_data, file="P:/Research/Thesis/PRP_thesis/Data/sla2.csv")
+
+#from now on use the edited dataset:
+sla2<-read.csv("P:/Research/Thesis/PRP_thesis/Data/sla2.csv", header=TRUE)
+View(sla2)
+```
+
+Create a 'rep' variable combining block, level, and replicate:
+```{r}
+sla2$rep=paste(sla2$block.num, sla2$level, sla2$replicate)
+sla2$rep=as.factor(sla2$rep)
+View(sla2)
+```
+
+Let's view relationships with the extreme outliers removed:
+```{r }
+#view relationships between sla and treatment effects
+bwplot(leaf.sla ~ treat | factor(diversity), data=sla2)
+bwplot(leaf.sla ~ treat + diversity | factor(taxa), data=sla2)
+#control actually looks to be lower than all the others, but there are some wicked outliers in the low-diversity plots
+
+#Anovas of differences
+treat.aov<-aov(leaf.sla ~ treat + diversity, data=sla2)
+s<-summary (treat.aov)
+pander(s)
+#Treatment is super significant. Why?????
+#do a glm to see what the relative effects are of treatments:
+treat.glm<-glm(leaf.sla ~ treat*diversity, data=sla2)
+summary(treat.glm)
+#now nothing is even remotely significant...
+#try accounting for some of the variation:
+treat.lmer<-lmer(leaf.sla~treat*diversity + (1|block) + (1|level), data=sla2)
+summary(treat.lmer)
+#nothing has a significant effect escept for the intercept. 
+
+#do a two-way interaction plot:
+interaction.plot(sla$treat, sla$diversity, sla$leaf.sla, col = c("red", "blue"))
+#perform a two-way mixed-model ANOVA
+fit<-lmer(leaf.sla~treat*diversity + (1|rep), data=sla2)
+summary(fit)
+```
+
+Subset ANGE for analysis:
+```{r echo=FALSE}
+#subset individual species for analysis
+ange.sla<-subset(sla2, taxa=="ANGE")
+View(ange.sla)
+#ange.sla<-as.data.frame(ange.sla)
+ange.aov<-aov(ange.sla$leaf.sla ~ ange.sla$diversity*ange.sla$treat)
+summary(ange.aov)
+
+ange.aov2<-aov(leaf.sla~diversity + treat + block + level, data=ange.sla)
+summary(ange.aov2)
+#Wow. So treatment and diversity were both marginally effective at determining ANGE sla.
+###CORRECTED: with the outlier removed, only diversity is significant, but this is pretty highly significant. 
+##(p=0.007)
+
+###example script###
+#correlation between OM and invasive density
+#all invaders
+#oplot<-ggplot(invsoil, aes(x=avg.c, y=all.index))
+#oplot + geom_point() + geom_smooth()
+#o<-oplot + geom_point() + geom_smooth()
+###end example script###
+
+
+#Plot the relationship between ANGE leaf.sla and diveristy using a boxplot
+#first make diversity a factor
+sla2$diversity = as.factor(sla2$diversity)
+ange.sla$diversity = as.factor(ange.sla$diversity)
+#now try again:
+angeplot<-ggplot(ange.sla, aes(x=diversity, y=leaf.sla), na.rm=TRUE)
+angeplot + geom_boxplot()
+#Interesting. Many more outliers in the ld category. HD is much more tightly grouped. The >600 outlier was removed for analysis.
+
+####test differences in group means by diversity###
+#first, subset data into two groups, ld and hd
+ange.sla.hd<-subset(ange.sla, diversity==2)
+a.sla.h<-ange.sla.hd[c("leaf.sla")]
+ange.sla.ld<-subset(ange.sla, diversity==1)
+a.sla.l<-ange.sla.ld[c("leaf.sla")]
+#Welch's t-tests for un-transformed data
+t.test(a.sla.h, a.sla.l)
+#mean of x (hd group) is 176.35, while mean of y (mono) is 156.58. this difference is significant (p=0.00294) 
+
+#compare variances of groups
+#var.test(a.sla.h$leaf.sla, a.sla.l$leaf.sla)
+#f=0.26538, p=1.682e-8: variances are significantly different from 1. Ratio of variance from sample estimates is 0.2653. 
+#qf(0.95, 67, 130)
+#f=1.40555, much higher than tabulated f, so there is definitely a difference in group variances.
+
+#try taking the log of both groups to normalize data:
+a.sla.h<-log(a.sla.h$leaf.sla)
+as.matrix(a.sla.h)
+plot(a.sla.h)
+a.sla.l<-log(a.sla.l$leaf.sla)
+as.matrix(a.sla.l)
+plot(a.sla.l)
+
+var.test(a.sla.h, a.sla.l)
+qf(0.95, 67, 129)
+#variances are closer together but still not overlapping There is too much variation in these groups to really compare their means
+
+#However, looking at their means there is a good argument that they do vary by diversity:
+t.test(a.sla.h, a.sla.l)
+
+###plot treatment effects on ANGE sla###
+#first get a model for treatment corrected for block and level
+angeplot2<-ggplot(ange.sla, aes(x=treat, y=leaf.sla))
+angeplot2 + geom_boxplot()                   
+#These boxplots did not account for any of the environmental variance.
+
+#try a two-way interaction plot:
+ange.interact<-interaction.plot(ange.sla$treat, ange.sla$diversity, ange.sla$leaf.sla, col = c("red", "blue"))
+#perform a two-way mixed-model ANOVA
+fit<-lmer(leaf.sla~treat*diversity + (1|rep), data=ange.sla)
+summary(fit)
+#okay, so according to this nothing had a significant influence, or even marginally significant influence. Effects that were significantly correlated with the intercept (ie, no effect, corr >0.5) include diversity, bn, n, rainout, control, and ctrl:diversity.
+
+###EXAMPLE SCRIPT###
+#all4<-lmer(all.index ~ (1|rep), data=invsoil, REML=FALSE)
+#summary(all4)
+#anova(all1.2, all4, test="F")
+#anova(all1.2, all4)
+###END EXAMPLE###
+
+#I need to create a fitted model for ANGE using block and level as random effects variables:
+#do a global model for ANGE:
+ange<-lmer(leaf.sla ~ diversity + treat + diversity*treat + (1|rep), data = ange.sla, REML=TRUE)
+a<-summary(ange)
+a
+drop1(ange)
+#treatment and diversity are not closely correlated, represent separate effects. 
+#All treatments are highly correlated with the intercept, sugesting they may not have a significant effect. 
+#All treatments have insignificant correlations. Diversity is the closest to being significant (p=0.145) but still far outsite even the marginal significance range. 
+#only 
+```
+
+
+Example from Invader density index script:
+ANOVAs for combined fixed and random factors:
+```{r}
+library(nlme)
+library(lmerTest)
+###EXAMPLE SCRIPT###
+#for cirsium species
+#z <- lme(cirsium.index ~ diversity*avg.c, random = ~ 1|rep, data = invsoil) # nlme package
+#z <- lmer(cirsium.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+#plot(z)
+#dat=invsoil
+###END EXAMPLE###
+
+#Do lmer for ANGE sla
+z<-lmer(leaf.sla ~ diversity + treat + diversity*treat + (1|rep), data=ange.sla)
+plot(z)
+
+#Variances are definitely grouped somehow - this is a bit odd.
+#try log-transformation:
+ange.sla$log.leaf.sla<-log(ange.sla$leaf.sla)
+zlog<-lmer(log.leaf.sla ~ diversity*treat + (1|block) + (1|level) + (1|replicate), data=ange.sla)
+plot(zlog)
+summary(zlog)
+#still grouped - this is really weird.
+
+###EXAMPLE SCRIPT###
+#model-based fitted means for treatments:
+#lsmeans(z, c("diversity", "avg.c"))
+#lsmeans(z, c("diversity"))
+#az<-anova(z)
+#az
+#boxplot
+#dat=invsoil
+#dat$diversity=as.factor(dat$diversity)
+#dat$predaz=predict(z)  
+#zplot<-ggplot(data=dat, aes(x=diversity, y=predaz, fill=diversity)) + scale_fill_grey(start=0.4, end=1.0) + #geom_boxplot() + labs(x="Diversity", y="Thistle Invasion by diversity*soil OM + BlockID.rand.eff.")
+#zplot
+###END EXAMPLE SCRIPT###
+
+#Now do it for ANGE:
+a<-lsmeans(z, c("diversity", "treat"))
+b<-lsmeans(z, c("diversity"))
+az<-anova(z)
+az
+##I don't know why these values are so significant. 
+
+#Compute values for making a boxplot
+dat=na.omit(ange.sla)
+#View(dat)
+dat$predaz=predict(z)
+#replacement has 198 rows, data has 199. Need to figure out what to do with NA values?
+#used function na.omit to get rid of missing data 
+
+##now plot the predicted values based on the linear mixed-effects model
+zplot<-ggplot(data=dat, aes(x=taxa, y=predaz, fill=taxa)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Diversity", y="SLA(ANGE) by diversity:treatment + random effects")
+zplot
+#Wow! Groups are different by species!
+
+
+
+###EXAMPLE SCRIPT###
+###for woody invaders
+#z2 <- lme(woody.index ~ diversity*avg.c, random = ~ 1|rep, data = invsoil) # nlme package
+#z2 <- lmer(woody.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+#plot(z2)
+#dat=invsoil
+#dat$diversity=as.factor(dat$diversity)
+#model-based fitted means for treatments:
+#lsmeans(z2, c("diversity", "avg.c"))
+#lsmeans(z2, c("diversity"))
+#az2<-anova(z2)
+#az2
+
+##boxplot
+#dat$predaz2=predict(z2)  
+#zplot2<-ggplot(data=dat, aes(x=diversity, y=predaz2, fill=diversity)) + scale_fill_grey(start=0.4, #end=1.0) + geom_boxplot() + labs(x="Diversity", y="Woody Invasion by diversity*soil OM + #BlockID.rand.eff.")
+#zplot2
+
+
+###for all invaders
+z1 <- lmer(all.index ~ diversity*avg.c + (1|rep), data = invsoil) 
+plot(z)
+dat=invsoil
+
+#model-based fitted means for treatments:
+lsmeans(z, c("diversity", "avg.c"))
+lsmeans(z, c("diversity"))
+az1<-anova(z1)
+az1
+
+#boxplot
+dat$diversity=as.factor(dat$diversity)
+dat$predaz1=predict(z1)  
+zplot1<-ggplot(data=dat, aes(x=diversity, y=predaz1, fill=diversity)) + scale_fill_grey(start=0.4, end=1.0) + geom_boxplot() + labs(x="Diversity", y="Total Invasion by diversity*soil OM + BlockID.rand.eff.")
+zplot1
+
+
+#plot all 3 together:
+grid.arrange(zplot1, zplot, zplot2, ncol=3)
+```
+
+
+Subset all Helianthus species for analysis:
+```{r}
+#subset individual species for analysis
+helianthus.sla<-subset(sla2, taxa==c("HEMAX", "HEPA"))
+View(helianthus.sla)
+helianthus.sla<-as.data.frame(helianthus.sla)
+helianthus.aov<-aov(leaf.sla ~ diversity + treat, data=helianthus.sla)
+summary(helianthus.aov)
+#treatment is significant. Not sure why diversity is not included in the table...
+#oh. it's because diversity is not a factor in this table.  
+helianthus.sla$diversity<-as.factor(helianthus.sla$diversity)
+##let's try using all of the factors:
+helianthus.sla2<-aov(leaf.sla~diversity + treat + block + level + diversity, data=helianthus.sla)
+summary(helianthus.sla2)
+#Treatment and block are significant predictors of Helianthus leaf SLA. The inclusion of site factors block and level make the 
+
+###example script###
+#correlation between OM and invasive density
+#all invaders
+#oplot<-ggplot(invsoil, aes(x=avg.c, y=all.index))
+#oplot + geom_point() + geom_smooth()
+#o<-oplot + geom_point() + geom_smooth()
+###end example script###
+
+
+#Plot the relationship between ANGE leaf.sla and diveristy using a boxplot
+#first make diversity a factor
+sla2$diversity = as.factor(sla2$diversity)
+ange.sla$diversity = as.factor(ange.sla$diversity)
+#now try again:
+angeplot<-ggplot(ange.sla, aes(x=diversity, y=leaf.sla), na.rm=TRUE)
+angeplot + geom_boxplot()
+#Interesting. Many more outliers in the ld category. HD is much more tightly grouped. The >600 outlier was removed for analysis.
+
+####test differences in group means by diversity###
+#first, subset data into two groups, ld and hd
+ange.sla.hd<-subset(ange.sla, diversity==2)
+a.sla.h<-ange.sla.hd[c("leaf.sla")]
+ange.sla.ld<-subset(ange.sla, diversity==1)
+a.sla.l<-ange.sla.ld[c("leaf.sla")]
+#Welch's t-tests for un-transformed data
+t.test(a.sla.h, a.sla.l)
+#mean of x (hd group) is 176.35, while mean of y (mono) is 156.58. this difference is significant (p=0.00294) 
+
+#compare variances of groups
+#var.test(a.sla.h$leaf.sla, a.sla.l$leaf.sla)
+#f=0.26538, p=1.682e-8: variances are significantly different from 1. Ratio of variance from sample estimates is 0.2653. 
+#qf(0.95, 67, 130)
+#f=1.40555, much higher than tabulated f, so there is definitely a difference in group variances.
+
+#try taking the log of both groups to normalize data:
+a.sla.h<-log(a.sla.h$leaf.sla)
+as.matrix(a.sla.h)
+plot(a.sla.h)
+a.sla.l<-log(a.sla.l$leaf.sla)
+as.matrix(a.sla.l)
+plot(a.sla.l)
+
+var.test(a.sla.h, a.sla.l)
+qf(0.95, 67, 129)
+#variances are closer together but still not overlapping There is too much variation in these groups to really compare their means
+
+#However, looking at their means there is a good argument that they do vary by diversity:
+t.test(a.sla.h, a.sla.l)
+
+###plot treatment effects on ANGE sla###
+#first get a model for treatment corrected for block and level
+angeplot2<-ggplot(ange.sla, aes(x=treat, y=leaf.sla))
+angeplot2 + geom_boxplot()                   
+#These boxplots did not account for any of the environmental variance.
+#I need to create a fitted model for ANGE using block and level as random effects variables:
+
+###EXAMPLE SCRIPT###
+#all4<-lmer(all.index ~ (1|rep), data=invsoil, REML=FALSE)
+#summary(all4)
+#anova(all1.2, all4, test="F")
+#anova(all1.2, all4)
+###END EXAMPLE###
+
+#do a global model for ANGE:
+ange<-lmer(leaf.sla ~ diversity *treat + (1|block) + (1|level) + (1|replicate), data = ange.sla, REML=FALSE)
+a<-summary(ange)
+a
+
+
+
+```
+

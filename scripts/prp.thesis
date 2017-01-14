@@ -1,0 +1,83 @@
+---
+title: "prp_community_assessment"
+author: "Rebecca Bevans"
+date: "November 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+load data
+```{r}
+library(picante)
+comm<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.comm11.7.16.csv", row.names=1)
+class(comm)
+dim(comm)
+rownames(comm)
+colnames(comm)
+comm[1:5, 1:5]
+metadata<-read.csv("C:/Users/rbevans2/Desktop/FIELD DATA 2016!!/CommunityData/prp.metadata11.7.16.csv", row.names=1)
+all.equal(rownames(comm), rownames(metadata))
+```
+
+Compare species richness between habitats:
+```{r}
+#species richness
+specnumber()
+#check total abundance /sample
+apply(comm, 1, sum)
+comm<-decostand(comm, method="total")
+apply(comm, 1, sum)
+comm[1:5, 1:5]
+```
+
+```{r}
+boxplot(specnumber(comm)~metadata$diversity, ylab = "# of species")
+boxplot(specnumber(comm)~metadata$year, ylab = "# of species")
+```
+
+Statistical test of difference:
+```{r}
+#welch's t-test:
+t.test(specnumber(comm)~metadata$diversity)
+t.test(specnumber(comm)~metadata$year)
+```
+
+We have our species comparisons by quadrat, but these are not individual observations. Need to average to the transect level.
+```{r}
+library(reshape2)
+```
+
+Recast dataframe to get the site x species format:
+```{r}
+site.sp.matrix<-dcast(prpcomm, site ~ taxa, value.var = 'cover_class', fun.aggregate=mean)
+#convert output to data frame
+site.sp.matrix<-as.data.frame(site.sp.matrix)
+#convert NaNs to 0
+site.sp.matrix[is.na(site.sp.matrix)]<-0
+```
+
+Melt data back into column form to average quadrats within plots:
+```{r}
+prp.column.quad<-melt(site.sp.matrix, id=c('site'))
+
+```
+Now all of the zeroes have been added in, so resulting dataframe is much bigger. Now average over the plots:
+```{r}
+site.sp.matrix<-dcast(prp.column.quad, site ~ variable, value.var = 'value', fun.aggregate = mean)
+colnames(site.sp.matrix)
+```
+
+
+Did we do good job of sampling the diversity? Use a collector's curve to assess. 
+Plot species accumulation curve across samples:
+```{r}
+plot(specaccum(comm), xlab = "# of samples", ylab = "# of species")
+```
+
+Ordination
+```{r}
+comm.bc.mds <- metaMDS(comm, dist = "bray", k=3, try=100)
+```
+

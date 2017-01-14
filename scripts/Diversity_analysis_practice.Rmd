@@ -1,0 +1,104 @@
+---
+title: "Diversity_practice_VEGAN"
+author: "Rebecca Bevans"
+date: "November 22, 2016"
+output: html_document
+---
+
+---
+title: "Vegetation_diversity_practice"
+author: "Rebecca Bevans"
+date: "November 22, 2016"
+output: html_document
+---
+load libraries and data:
+```{r}
+library(vegan)
+library(MASS)
+data(BCI)
+dim(BCI)
+BCI[1:10, 20:25]
+BCI[1:5, 70:75]
+BCI$Faramea.occidentalis
+sum(BCI$Faramea.occidentalis)
+sum(BCI$Poulsenia.armata)
+```
+
+Shannon Diversity Indices:
+```{r}
+#get diversity for each plot
+diversity(BCI, index = "shannon")
+```
+
+Use these samples to get average diversity for a hectare on Barro Colorado Island:
+```{r }
+plots<-diversity(BCI, index = "shannon")
+summary(plots)
+median(plots)
+mean(plots)
+```
+
+Fisher's Diversity:
+```{r}
+fish.a<-fisher.alpha(BCI, MARGIN = 1)
+fish.a
+```
+
+Use Fisher's to get average diversity:
+```{r}
+bcitot<- apply(BCI, 2, sum)
+bcitot.a<-fisher.alpha(bcitot, MARGIN=1)
+bcitot
+bcitot.a
+```
+
+Calculate Fisher's alpha for increasing numbers of hectares combined:
+```{r}
+x<-1:50
+a<-NULL
+for(i in x){
+b<-apply(BCI[1:i,],2, sum)
+c<-fisher.alpha(b, MARGIN=1)
+a<-c(a,c) 
+}
+plot(x,a)
+```
+
+Species richness:
+```{r}
+rar<-rarefy(BCI, 20)
+rarsum<-rarefy(bcitot, 20, MARGIN=2)
+rar
+rarsum
+```
+
+Species-area and species-individual curves:
+```{r}
+spa<-specaccum(BCI)
+plot(spa)
+plot(spa, ci.type="poly", col="blue", lwd=2, ci.lty=0, ci.col="lightblue")
+
+#Now try the same thing doing individuals rather than sites
+spi<-specaccum(BCI, method="rarefaction")
+plot(spi)
+```
+
+Ordination
+Distance measures:
+Bray-Curtis index = percent similarity including species abundances. Sorenson's index = percent similarity based on presence-absence data.
+```{r}
+bc<-vegdist(BCI, method = "bray", binary=FALSE)
+bc
+
+```
+
+create a map of the plots in community composition space using Non-metric Multidimensional scaling.
+```{r}
+bci.mds<-metaMDS(BCI, distance = "bray", k=2, trymax = 20, autotransform = TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+
+plot(bci.mds, choices = c(1,2), type="n")
+points(bci.mds, display = c("sites"))
+text(bci.mds, display = c("sites"))
+
+```
+
